@@ -176,7 +176,7 @@ class Matris(object):
         """
         Draws the image of the current tetromino
         """
-        with_tetromino = self.blend(matrix=self.place_shadow())
+        with_tetromino = self.blend()
 
         for y in range(MATRIX_HEIGHT):
             for x in range(MATRIX_WIDTH):
