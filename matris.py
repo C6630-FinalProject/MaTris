@@ -4,6 +4,8 @@ from pygame import Rect, Surface
 import random
 import os
 import kezmenu
+from multiprocessing import shared_memory
+import numpy as np
 
 from tetrominoes import list_of_tetrominoes
 from tetrominoes import rotate
@@ -36,6 +38,9 @@ TRICKY_CENTERX = WIDTH-(WIDTH-(MATRIS_OFFSET+BLOCKSIZE*MATRIX_WIDTH+BORDERWIDTH*
 
 VISIBLE_MATRIX_HEIGHT = MATRIX_HEIGHT - 2
 
+
+#shm
+shm_a = shared_memory.SharedMemory(name='matris',create=True, size=3*np.dtype(np.uint32).itemsize)
 
 class Matris(object):
     def __init__(self):
@@ -79,7 +84,16 @@ class Matris(object):
         self.linescleared_sound = get_sound("linecleared.wav")
         self.highscorebeaten_sound = get_sound("highscorebeaten.wav")
 
+        
 
+
+    #shared memory for tetris agent
+    def update_shm(self, gameover=0):
+        #shm
+        a=np.array([self.score, self.lines, gameover]).astype(np.uint32)
+        b=np.ndarray(a.shape, dtype=a.dtype, buffer=shm_a.buf)
+        b[:] = a[:]
+        
     def set_tetrominoes(self):
         """
         Sets information for the current and next tetrominos
@@ -101,6 +115,8 @@ class Matris(object):
         while self.request_movement('down'):
             amount += 1
         self.score += 10*amount
+        #shm
+        self.update_shm()
 
         self.lock_tetromino()
 
@@ -337,11 +353,14 @@ class Matris(object):
             if lines_cleared >= 4:
                 self.linescleared_sound.play()
             self.score += 100 * (lines_cleared**2) * self.combo
+            #shm
+            self.update_shm()
 
             if not self.played_highscorebeaten_sound and self.score > self.highscore:
                 if self.highscore != 0:
                     self.highscorebeaten_sound.play()
                 self.played_highscorebeaten_sound = True
+                
 
         if self.lines >= self.level*10:
             self.levelup_sound.play()
@@ -352,6 +371,8 @@ class Matris(object):
         self.set_tetrominoes()
 
         if not self.blend():
+            #shm
+            self.update_shm()
             self.gameover_sound.play()
             self.gameover()
             
@@ -443,9 +464,14 @@ class Game(object):
         while True:
             try:
                 timepassed = clock.tick(50)
+                self.matris.update_shm()
                 if self.matris.update((timepassed / 1000.) if not self.matris.paused else 0):
                     self.redraw()
             except GameOver:
+                #shm
+                self.matris.score=0
+                self.matris.lines=0
+                self.matris.update_shm(gameover=1)
                 return
       
 
